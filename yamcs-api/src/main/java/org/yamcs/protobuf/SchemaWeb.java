@@ -450,6 +450,9 @@ public final class SchemaWeb
                     if(message.hasTimeInfo())
                         output.writeObject(11, message.getTimeInfo(), org.yamcs.protobuf.SchemaYamcs.TimeInfo.WRITE, false);
 
+                    if(message.hasContainerData())
+                        output.writeObject(12, message.getContainerData(), org.yamcs.protobuf.SchemaCvalue.ContainerData.WRITE, false);
+
                 }
                 public boolean isInitialized(org.yamcs.protobuf.Web.WebSocketServerMessage.WebSocketSubscriptionData message)
                 {
@@ -531,6 +534,10 @@ public final class SchemaWeb
                                 builder.setTimeInfo(input.mergeObject(org.yamcs.protobuf.Yamcs.TimeInfo.newBuilder(), org.yamcs.protobuf.SchemaYamcs.TimeInfo.MERGE));
 
                                 break;
+                            case 12:
+                                builder.setContainerData(input.mergeObject(org.yamcs.protobuf.Cvalue.ContainerData.newBuilder(), org.yamcs.protobuf.SchemaCvalue.ContainerData.MERGE));
+
+                                break;
                             default:
                                 input.handleUnknownField(number, this);
                         }
@@ -582,6 +589,7 @@ public final class SchemaWeb
                     case 9: return "streamData";
                     case 10: return "alarmInfo";
                     case 11: return "timeInfo";
+                    case 12: return "containerData";
                     default: return null;
                 }
             }
@@ -604,6 +612,7 @@ public final class SchemaWeb
                 fieldMap.put("streamData", 9);
                 fieldMap.put("alarmInfo", 10);
                 fieldMap.put("timeInfo", 11);
+                fieldMap.put("containerData", 12);
             }
         }
 

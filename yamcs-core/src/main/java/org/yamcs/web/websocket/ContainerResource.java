@@ -16,7 +16,7 @@ import org.yamcs.container.ContainerWithIdRequestHelper;
 import org.yamcs.protobuf.Cvalue.ContainerData;
 import org.yamcs.protobuf.SchemaCvalue;
 import org.yamcs.protobuf.SchemaYamcs;
-import org.yamcs.protobuf.Websocket.WebSocketServerMessage.WebSocketReplyData;
+import org.yamcs.protobuf.Web.WebSocketServerMessage.WebSocketReplyData;
 import org.yamcs.protobuf.Yamcs.NamedObjectId;
 import org.yamcs.protobuf.Yamcs.NamedObjectList;
 import org.yamcs.protobuf.Yamcs.ProtoDataType;

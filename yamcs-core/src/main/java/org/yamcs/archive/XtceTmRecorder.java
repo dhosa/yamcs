@@ -131,7 +131,7 @@ public class XtceTmRecorder extends AbstractService {
             throw new ConfigurationException("XtceDb does not have a root sequence container and no container was specified for decoding packets from "+streamConf.getName()+" stream");
         }
 
-        startProviding(rootsc);
+        subscribeContainers(rootsc);
         
         Stream inputStream=ydb.getStream(streamConf.getName());    
 

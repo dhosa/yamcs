@@ -8,8 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-
-import org.python.modules.synchronize;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yamcs.ContainerExtractionResult;
@@ -18,8 +16,6 @@ import org.yamcs.NoPermissionException;
 import org.yamcs.ParameterValue;
 import org.yamcs.parameter.ParameterConsumer;
 import org.yamcs.parameter.ParameterRequestManagerImpl;
-import org.yamcs.parameter.SubscriptionArray;
-import org.yamcs.protobuf.Cvalue.ContainerValue;
 import org.yamcs.protobuf.Yamcs.NamedObjectId;
 import org.yamcs.security.AuthenticationToken;
 import org.yamcs.security.Privilege;

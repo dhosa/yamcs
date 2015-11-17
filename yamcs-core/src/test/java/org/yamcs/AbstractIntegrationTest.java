@@ -242,22 +242,8 @@ public abstract class AbstractIntegrationTest {
                 throw new IllegalArgumentException("Unexpected type " + data.getType());
             }
         }
-<<<<<<< HEAD
-=======
-        
-        @Override
-        public void onTimeInfo(TimeInfo timeInfo) {
-            timeInfoList.add(timeInfo);
-        }
-
-		@Override
-		public void onContainerData(ContainerData cdata) {
-			// TODO Auto-generated method stub
-			
-		}
-        
->>>>>>> Add onContainer to AbstractIntegrationTest
     }
+    
     public static class PacketProvider extends AbstractService implements TmPacketSource, TmProcessor {
         static volatile PacketProvider instance;
         RefMdbPacketGenerator mdbPacketGenerator = new RefMdbPacketGenerator();
