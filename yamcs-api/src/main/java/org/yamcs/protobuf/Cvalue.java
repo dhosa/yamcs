@@ -8,10 +8,10 @@ public final class Cvalue {
   public static void registerAllExtensions(
       com.google.protobuf.ExtensionRegistry registry) {
   }
-  public interface ContainerValueOrBuilder extends
-      // @@protoc_insertion_point(interface_extends:cvalue.ContainerValue)
-      com.google.protobuf.MessageOrBuilder {
+  public interface ContainerValueOrBuilder
+      extends com.google.protobuf.MessageOrBuilder {
 
+    // optional .yamcs.NamedObjectId id = 1;
     /**
      * <code>optional .yamcs.NamedObjectId id = 1;</code>
      */
@@ -25,6 +25,7 @@ public final class Cvalue {
      */
     org.yamcs.protobuf.Yamcs.NamedObjectIdOrBuilder getIdOrBuilder();
 
+    // repeated .pvalue.ParameterValue parameter = 2;
     /**
      * <code>repeated .pvalue.ParameterValue parameter = 2;</code>
      */
@@ -53,9 +54,8 @@ public final class Cvalue {
    * Protobuf type {@code cvalue.ContainerValue}
    */
   public static final class ContainerValue extends
-      com.google.protobuf.GeneratedMessage implements
-      // @@protoc_insertion_point(message_implements:cvalue.ContainerValue)
-      ContainerValueOrBuilder {
+      com.google.protobuf.GeneratedMessage
+      implements ContainerValueOrBuilder {
     // Use ContainerValue.newBuilder() to construct.
     private ContainerValue(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
       super(builder);
@@ -165,6 +165,7 @@ public final class Cvalue {
     }
 
     private int bitField0_;
+    // optional .yamcs.NamedObjectId id = 1;
     public static final int ID_FIELD_NUMBER = 1;
     private org.yamcs.protobuf.Yamcs.NamedObjectId id_;
     /**
@@ -186,6 +187,7 @@ public final class Cvalue {
       return id_;
     }
 
+    // repeated .pvalue.ParameterValue parameter = 2;
     public static final int PARAMETER_FIELD_NUMBER = 2;
     private java.util.List<org.yamcs.protobuf.Pvalue.ParameterValue> parameter_;
     /**
@@ -228,8 +230,7 @@ public final class Cvalue {
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
       byte isInitialized = memoizedIsInitialized;
-      if (isInitialized == 1) return true;
-      if (isInitialized == 0) return false;
+      if (isInitialized != -1) return isInitialized == 1;
 
       if (hasId()) {
         if (!getId().isInitialized()) {
@@ -355,9 +356,8 @@ public final class Cvalue {
      * Protobuf type {@code cvalue.ContainerValue}
      */
     public static final class Builder extends
-        com.google.protobuf.GeneratedMessage.Builder<Builder> implements
-        // @@protoc_insertion_point(builder_implements:cvalue.ContainerValue)
-        org.yamcs.protobuf.Cvalue.ContainerValueOrBuilder {
+        com.google.protobuf.GeneratedMessage.Builder<Builder>
+       implements org.yamcs.protobuf.Cvalue.ContainerValueOrBuilder {
       public static final com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return org.yamcs.protobuf.Cvalue.internal_static_cvalue_ContainerValue_descriptor;
@@ -533,6 +533,7 @@ public final class Cvalue {
       }
       private int bitField0_;
 
+      // optional .yamcs.NamedObjectId id = 1;
       private org.yamcs.protobuf.Yamcs.NamedObjectId id_ = org.yamcs.protobuf.Yamcs.NamedObjectId.getDefaultInstance();
       private com.google.protobuf.SingleFieldBuilder<
           org.yamcs.protobuf.Yamcs.NamedObjectId, org.yamcs.protobuf.Yamcs.NamedObjectId.Builder, org.yamcs.protobuf.Yamcs.NamedObjectIdOrBuilder> idBuilder_;
@@ -641,7 +642,7 @@ public final class Cvalue {
         if (idBuilder_ == null) {
           idBuilder_ = new com.google.protobuf.SingleFieldBuilder<
               org.yamcs.protobuf.Yamcs.NamedObjectId, org.yamcs.protobuf.Yamcs.NamedObjectId.Builder, org.yamcs.protobuf.Yamcs.NamedObjectIdOrBuilder>(
-                  getId(),
+                  id_,
                   getParentForChildren(),
                   isClean());
           id_ = null;
@@ -649,6 +650,7 @@ public final class Cvalue {
         return idBuilder_;
       }
 
+      // repeated .pvalue.ParameterValue parameter = 2;
       private java.util.List<org.yamcs.protobuf.Pvalue.ParameterValue> parameter_ =
         java.util.Collections.emptyList();
       private void ensureParameterIsMutable() {
@@ -790,8 +792,7 @@ public final class Cvalue {
           java.lang.Iterable<? extends org.yamcs.protobuf.Pvalue.ParameterValue> values) {
         if (parameterBuilder_ == null) {
           ensureParameterIsMutable();
-          com.google.protobuf.AbstractMessageLite.Builder.addAll(
-              values, parameter_);
+          super.addAll(values, parameter_);
           onChanged();
         } else {
           parameterBuilder_.addAllMessages(values);
@@ -900,10 +901,10 @@ public final class Cvalue {
     // @@protoc_insertion_point(class_scope:cvalue.ContainerValue)
   }
 
-  public interface ContainerDataOrBuilder extends
-      // @@protoc_insertion_point(interface_extends:cvalue.ContainerData)
-      com.google.protobuf.MessageOrBuilder {
+  public interface ContainerDataOrBuilder
+      extends com.google.protobuf.MessageOrBuilder {
 
+    // repeated .cvalue.ContainerValue container = 1;
     /**
      * <code>repeated .cvalue.ContainerValue container = 1;</code>
      */
@@ -932,9 +933,8 @@ public final class Cvalue {
    * Protobuf type {@code cvalue.ContainerData}
    */
   public static final class ContainerData extends
-      com.google.protobuf.GeneratedMessage implements
-      // @@protoc_insertion_point(message_implements:cvalue.ContainerData)
-      ContainerDataOrBuilder {
+      com.google.protobuf.GeneratedMessage
+      implements ContainerDataOrBuilder {
     // Use ContainerData.newBuilder() to construct.
     private ContainerData(com.google.protobuf.GeneratedMessage.Builder<?> builder) {
       super(builder);
@@ -1030,6 +1030,7 @@ public final class Cvalue {
       return PARSER;
     }
 
+    // repeated .cvalue.ContainerValue container = 1;
     public static final int CONTAINER_FIELD_NUMBER = 1;
     private java.util.List<org.yamcs.protobuf.Cvalue.ContainerValue> container_;
     /**
@@ -1071,8 +1072,7 @@ public final class Cvalue {
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
       byte isInitialized = memoizedIsInitialized;
-      if (isInitialized == 1) return true;
-      if (isInitialized == 0) return false;
+      if (isInitialized != -1) return isInitialized == 1;
 
       for (int i = 0; i < getContainerCount(); i++) {
         if (!getContainer(i).isInitialized()) {
@@ -1185,9 +1185,8 @@ public final class Cvalue {
      * Protobuf type {@code cvalue.ContainerData}
      */
     public static final class Builder extends
-        com.google.protobuf.GeneratedMessage.Builder<Builder> implements
-        // @@protoc_insertion_point(builder_implements:cvalue.ContainerData)
-        org.yamcs.protobuf.Cvalue.ContainerDataOrBuilder {
+        com.google.protobuf.GeneratedMessage.Builder<Builder>
+       implements org.yamcs.protobuf.Cvalue.ContainerDataOrBuilder {
       public static final com.google.protobuf.Descriptors.Descriptor
           getDescriptor() {
         return org.yamcs.protobuf.Cvalue.internal_static_cvalue_ContainerData_descriptor;
@@ -1337,6 +1336,7 @@ public final class Cvalue {
       }
       private int bitField0_;
 
+      // repeated .cvalue.ContainerValue container = 1;
       private java.util.List<org.yamcs.protobuf.Cvalue.ContainerValue> container_ =
         java.util.Collections.emptyList();
       private void ensureContainerIsMutable() {
@@ -1478,8 +1478,7 @@ public final class Cvalue {
           java.lang.Iterable<? extends org.yamcs.protobuf.Cvalue.ContainerValue> values) {
         if (containerBuilder_ == null) {
           ensureContainerIsMutable();
-          com.google.protobuf.AbstractMessageLite.Builder.addAll(
-              values, container_);
+          super.addAll(values, container_);
           onChanged();
         } else {
           containerBuilder_.addAllMessages(values);
@@ -1588,12 +1587,12 @@ public final class Cvalue {
     // @@protoc_insertion_point(class_scope:cvalue.ContainerData)
   }
 
-  private static final com.google.protobuf.Descriptors.Descriptor
+  private static com.google.protobuf.Descriptors.Descriptor
     internal_static_cvalue_ContainerValue_descriptor;
   private static
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
       internal_static_cvalue_ContainerValue_fieldAccessorTable;
-  private static final com.google.protobuf.Descriptors.Descriptor
+  private static com.google.protobuf.Descriptors.Descriptor
     internal_static_cvalue_ContainerData_descriptor;
   private static
     com.google.protobuf.GeneratedMessage.FieldAccessorTable
@@ -1615,33 +1614,31 @@ public final class Cvalue {
       "alueB\024\n\022org.yamcs.protobuf"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
-        new com.google.protobuf.Descriptors.FileDescriptor.    InternalDescriptorAssigner() {
-          public com.google.protobuf.ExtensionRegistry assignDescriptors(
-              com.google.protobuf.Descriptors.FileDescriptor root) {
-            descriptor = root;
-            return null;
-          }
-        };
+      new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
+        public com.google.protobuf.ExtensionRegistry assignDescriptors(
+            com.google.protobuf.Descriptors.FileDescriptor root) {
+          descriptor = root;
+          internal_static_cvalue_ContainerValue_descriptor =
+            getDescriptor().getMessageTypes().get(0);
+          internal_static_cvalue_ContainerValue_fieldAccessorTable = new
+            com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+              internal_static_cvalue_ContainerValue_descriptor,
+              new java.lang.String[] { "Id", "Parameter", });
+          internal_static_cvalue_ContainerData_descriptor =
+            getDescriptor().getMessageTypes().get(1);
+          internal_static_cvalue_ContainerData_fieldAccessorTable = new
+            com.google.protobuf.GeneratedMessage.FieldAccessorTable(
+              internal_static_cvalue_ContainerData_descriptor,
+              new java.lang.String[] { "Container", });
+          return null;
+        }
+      };
     com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
         new com.google.protobuf.Descriptors.FileDescriptor[] {
           org.yamcs.protobuf.Yamcs.getDescriptor(),
           org.yamcs.protobuf.Pvalue.getDescriptor(),
         }, assigner);
-    internal_static_cvalue_ContainerValue_descriptor =
-      getDescriptor().getMessageTypes().get(0);
-    internal_static_cvalue_ContainerValue_fieldAccessorTable = new
-      com.google.protobuf.GeneratedMessage.FieldAccessorTable(
-        internal_static_cvalue_ContainerValue_descriptor,
-        new java.lang.String[] { "Id", "Parameter", });
-    internal_static_cvalue_ContainerData_descriptor =
-      getDescriptor().getMessageTypes().get(1);
-    internal_static_cvalue_ContainerData_fieldAccessorTable = new
-      com.google.protobuf.GeneratedMessage.FieldAccessorTable(
-        internal_static_cvalue_ContainerData_descriptor,
-        new java.lang.String[] { "Container", });
-    org.yamcs.protobuf.Yamcs.getDescriptor();
-    org.yamcs.protobuf.Pvalue.getDescriptor();
   }
 
   // @@protoc_insertion_point(outer_class_scope)
