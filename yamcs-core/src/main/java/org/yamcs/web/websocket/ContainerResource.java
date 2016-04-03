@@ -23,27 +23,27 @@ import org.yamcs.protobuf.Yamcs.ProtoDataType;
 import org.yamcs.security.AuthenticationToken;
 
 public class ContainerResource extends AbstractWebSocketResource implements ContainerWithIdConsumer {
-	Logger log;
-	int subscriptionId = -1;
+    Logger log;
+    int subscriptionId = -1;
 
     public static final String WSR_subscribe = "subscribe";
     public static final String WSR_unsubscribe = "unsubscribe";
-	
-    ContainerWithIdRequestHelper cidrm;
-    
-	public ContainerResource(YProcessor yproc, WebSocketServerHandler wsHandler) {
-		super(yproc, wsHandler);
-		 
-        log = LoggerFactory.getLogger(ContainerResource.class.getName() + "[" + yproc.getInstance() + "]");
-        
-        cidrm = new ContainerWithIdRequestHelper(yproc.getParameterRequestManager(), this);
-        
-        wsHandler.addResource("container", this);
-	}
 
-	@Override
-	public WebSocketReplyData processRequest(WebSocketDecodeContext ctx, WebSocketDecoder decoder,
-			AuthenticationToken authToken) throws WebSocketException {
+    ContainerWithIdRequestHelper cidrm;
+
+    public ContainerResource(YProcessor yproc, WebSocketFrameHandler wsHandler) {
+        super(yproc, wsHandler);
+
+        log = LoggerFactory.getLogger(ContainerResource.class.getName() + "[" + yproc.getInstance() + "]");
+
+        cidrm = new ContainerWithIdRequestHelper(yproc.getParameterRequestManager(), this);
+
+        wsHandler.addResource("container", this);
+    }
+
+    @Override
+    public WebSocketReplyData processRequest(WebSocketDecodeContext ctx, WebSocketDecoder decoder,
+            AuthenticationToken authToken) throws WebSocketException {
         switch (ctx.getOperation()) {
         case WSR_subscribe:
             NamedObjectList subscribeList = decoder.decodeMessageData(ctx, SchemaYamcs.NamedObjectList.MERGE).build();
@@ -54,37 +54,37 @@ public class ContainerResource extends AbstractWebSocketResource implements Cont
         default:
             throw new WebSocketException(ctx.getRequestId(), "Unsupported operation '" + ctx.getOperation() + "'");
         }
-	}
-	
-	private WebSocketReplyData subscribe(int requestId, NamedObjectList paraList, AuthenticationToken authToken)
-			throws WebSocketException {
-		
-		List<NamedObjectId> idlist = paraList.getListList();		
-		try {
-			if (subscriptionId != -1) {
-				cidrm.subscribeContainers(subscriptionId, idlist, authToken);
-			} else {
-				subscriptionId = cidrm.subscribeContainers(idlist, authToken);
-			}
-			WebSocketReplyData reply = toAckReply(requestId);
-			wsHandler.sendReply(reply);
-			return null;			
-		} catch (InvalidIdentification e) {
-			NamedObjectList nol = NamedObjectList.newBuilder().addAllList(e.invalidParameters).build();
-			WebSocketException ex = new WebSocketException(requestId, e);
-			ex.attachData("InvalidIdentification", nol, SchemaYamcs.NamedObjectList.WRITE);
-			throw ex;
-		} catch (InvalidRequestIdentification e) {
-			log.error("got invalid subscription id", e);
-			throw new WebSocketException(requestId, "internal error: " + e.toString(), e);
-		} catch (IOException e) {
-			log.error("Exception when sending data", e);
-			return null;
-		} catch (NoPermissionException e) {
-			log.error("no permission for parameters", e);
-			throw new WebSocketException(requestId, "internal error: " + e.toString(), e);
-		}
-	}
+    }
+
+    private WebSocketReplyData subscribe(int requestId, NamedObjectList paraList, AuthenticationToken authToken)
+            throws WebSocketException {
+
+        List<NamedObjectId> idlist = paraList.getListList();
+        try {
+            if (subscriptionId != -1) {
+                cidrm.subscribeContainers(subscriptionId, idlist, authToken);
+            } else {
+                subscriptionId = cidrm.subscribeContainers(idlist, authToken);
+            }
+            WebSocketReplyData reply = toAckReply(requestId);
+            wsHandler.sendReply(reply);
+            return null;
+        } catch (InvalidIdentification e) {
+            NamedObjectList nol = NamedObjectList.newBuilder().addAllList(e.invalidParameters).build();
+            WebSocketException ex = new WebSocketException(requestId, e);
+            ex.attachData("InvalidIdentification", nol, SchemaYamcs.NamedObjectList.WRITE);
+            throw ex;
+        } catch (InvalidRequestIdentification e) {
+            log.error("got invalid subscription id", e);
+            throw new WebSocketException(requestId, "internal error: " + e.toString(), e);
+        } catch (IOException e) {
+            log.error("Exception when sending data", e);
+            return null;
+        } catch (NoPermissionException e) {
+            log.error("no permission for parameters", e);
+            throw new WebSocketException(requestId, "internal error: " + e.toString(), e);
+        }
+    }
 
     private WebSocketReplyData unsubscribe(int requestId, NamedObjectList paraList, AuthenticationToken authToken) throws WebSocketException {
         if(subscriptionId!=-1) {
@@ -97,21 +97,21 @@ public class ContainerResource extends AbstractWebSocketResource implements Cont
         } else {
             throw new WebSocketException(requestId, "Not subscribed to anything");
         }
-    }	
+    }
 
-	@Override
-	public void update(int subscriptionId, List<ContainerValueWithId> containers) {
+    @Override
+    public void update(int subscriptionId, List<ContainerValueWithId> containers) {
         if(wsHandler==null) {
-        	return;
+            return;
         }
-        
+
         if(containers == null || containers.size() == 0) {
             return;
         }
-        
+
         ContainerData.Builder cdata= ContainerData.newBuilder();
         for (ContainerValueWithId container: containers) {
-        	cdata.addContainer(container.toGbpContainerData());
+            cdata.addContainer(container.toGbpContainerData());
         }
 
         try {
@@ -119,18 +119,18 @@ public class ContainerResource extends AbstractWebSocketResource implements Cont
         } catch (Exception e) {
             log.warn("got error when sending container updates, quitting", e);
             quit();
-        }        	
-	}
+        }
+    }
 
-	@Override
-	public void quit() {
-		if (subscriptionId != -1) {
-			cidrm.removeSubscription(subscriptionId);
-		}
-	}
-	
-	@Override
-	public void switchYProcessor(YProcessor processor, AuthenticationToken authToken)  throws YProcessorException {
+    @Override
+    public void quit() {
+        if (subscriptionId != -1) {
+            cidrm.removeSubscription(subscriptionId);
+        }
+    }
+
+    @Override
+    public void switchYProcessor(YProcessor processor, AuthenticationToken authToken)  throws YProcessorException {
         try {
             cidrm.switchPrm(processor.getParameterRequestManager(), authToken);
         } catch (InvalidIdentification e) {
@@ -138,7 +138,7 @@ public class ContainerResource extends AbstractWebSocketResource implements Cont
             e.printStackTrace();
         } catch (NoPermissionException e) {
             log.warn("got NoPermissionException when resubscribing");
-            e.printStackTrace();        	
+            e.printStackTrace();
         }
-    }	
+    }
 }

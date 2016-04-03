@@ -26,18 +26,17 @@ public class WebSocketProcessorClient implements YProcessorClient {
     private AuthenticationToken authToken = null;
 
     private List<AbstractWebSocketResource> resources = new ArrayList<>();
-    
-    public WebSocketProcessorClient(String yamcsInstance, WebSocketServerHandler wsHandler, String applicationName, AuthenticationToken authToken) {
+
+    public WebSocketProcessorClient(String yamcsInstance, WebSocketFrameHandler wsHandler, String applicationName, AuthenticationToken authToken) {
         this.applicationName = applicationName;
         this.authToken = authToken;
         this.username = authToken != null ? authToken.getPrincipal().toString() : Privilege.getDefaultUser();
         log = YamcsServer.getLogger(WebSocketProcessorClient.class, yamcsInstance);
         YProcessor processor = YProcessor.getInstance(yamcsInstance, "realtime");
-        
 
         clientId = ManagementService.getInstance().registerClient(yamcsInstance, processor.getName(), this);
         resources.add(new ParameterResource(processor, wsHandler));
-    	resources.add(new ContainerResource(processor, wsHandler));
+        resources.add(new ContainerResource(processor, wsHandler));
         resources.add(new CommandHistoryResource(processor, wsHandler));
         resources.add(new ManagementResource(processor, wsHandler, clientId));
         resources.add(new AlarmResource(processor, wsHandler));
@@ -55,7 +54,7 @@ public class WebSocketProcessorClient implements YProcessorClient {
             resource.switchYProcessor(newProcessor, authToken);
         }
     }
-    
+
     public int getClientId() {
         return clientId;
     }
