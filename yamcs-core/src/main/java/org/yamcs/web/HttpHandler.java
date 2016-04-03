@@ -246,6 +246,10 @@ public class HttpHandler extends SimpleChannelInboundHandler<Object> {
         return ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE_ON_FAILURE);
     }
 
+    /**
+     * Writes a chunk out to the socket.<br>
+     * Can block the thread to throttle writes, when chunks are written out faster than they can be sent.
+     */
     public static ChannelFuture writeChunk(ChannelHandlerContext ctx, ByteBuf buf) throws IOException {
         Channel ch = ctx.channel();
         if (!ch.isOpen()) {
@@ -254,7 +258,7 @@ public class HttpHandler extends SimpleChannelInboundHandler<Object> {
         ChannelFuture writeFuture = ctx.writeAndFlush(new DefaultHttpContent(buf));
         try {
             if (!ch.isWritable()) {
-                log.warn("Channel open, but not writable. Waiting it out for max 10 seconds");
+                log.trace("Channel open, but not writable. Waiting it out for max 10 seconds");
                 boolean writeCompleted = writeFuture.await(10, TimeUnit.SECONDS);
                 if (!writeCompleted) {
                     throw new IOException("Channel did not become writable in 10 seconds");
