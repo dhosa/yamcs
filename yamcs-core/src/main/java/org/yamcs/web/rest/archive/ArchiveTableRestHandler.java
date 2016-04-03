@@ -25,36 +25,36 @@ import org.yamcs.yarch.YarchDatabase;
 import io.netty.channel.ChannelFuture;
 
 public class ArchiveTableRestHandler extends RestHandler {
-    
+
     @Route(path = "/api/archive/:instance/tables", method = "GET")
     public ChannelFuture listTables(RestRequest req) throws HttpException {
         String instance = verifyInstance(req, req.getRouteParam("instance"));
         YarchDatabase ydb = YarchDatabase.getInstance(instance);
-        
+
         ListTablesResponse.Builder responseb = ListTablesResponse.newBuilder();
         for (TableDefinition def : ydb.getTableDefinitions()) {
             responseb.addTable(ArchiveHelper.toTableInfo(def));
         }
         return sendOK(req, responseb.build(), SchemaRest.ListTablesResponse.WRITE);
     }
-    
+
     @Route(path = "/api/archive/:instance/tables/:name", method = "GET")
     public ChannelFuture getTable(RestRequest req) throws HttpException {
         String instance = verifyInstance(req, req.getRouteParam("instance"));
         YarchDatabase ydb = YarchDatabase.getInstance(instance);
         TableDefinition table = verifyTable(req, ydb, req.getRouteParam("name"));
-        
+
         TableInfo response = ArchiveHelper.toTableInfo(table);
         return sendOK(req, response, SchemaArchive.TableInfo.WRITE);
     }
-    
+
     @Route(path = "/api/archive/:instance/tables/:name/data", method = "GET")
-    public ChannelFuture getTableData(RestRequest req) throws HttpException {
+    public void getTableData(RestRequest req) throws HttpException {
         String instance = verifyInstance(req, req.getRouteParam("instance"));
         YarchDatabase ydb = YarchDatabase.getInstance(instance);
         TableDefinition table = verifyTable(req, ydb, req.getRouteParam("name"));
-        
-        List<String> cols = null;        
+
+        List<String> cols = null;
         if (req.hasQueryParameter("cols")) {
             cols = new ArrayList<>(); // Order, and non-unique
             for (String para : req.getQueryParameterList("cols")) {
@@ -65,29 +65,27 @@ public class ArchiveTableRestHandler extends RestHandler {
         }
         long pos = req.getQueryParameterAsLong("pos", 0);
         int limit = req.getQueryParameterAsInt("limit", 100);
-        
+
         SqlBuilder sqlb = new SqlBuilder(table.getName());
         if (cols != null) {
             if (cols.isEmpty()) {
-                throw new BadRequestException("No columns were specified");    
+                throw new BadRequestException("No columns were specified");
             } else {
                 cols.forEach(col -> sqlb.select(col));
             }
         }
         sqlb.descend(req.asksDescending(true));
-        
+
         String sql = sqlb.toString();
         TableData.Builder responseb = TableData.newBuilder();
-        RestStreams.streamAndWait(instance, sql, new RestStreamSubscriber(pos, limit) {
-            
+        RestStreams.runAsync(instance, sql, new RestStreamSubscriber(pos, limit) {
+
             @Override
             public void processTuple(Stream stream, Tuple tuple) {
                 TableRecord.Builder rec = TableRecord.newBuilder();
                 rec.addAllColumn(ArchiveHelper.toColumnDataList(tuple));
                 responseb.addRecord(rec); // TODO estimate byte size
             }
-        });
-        
-        return sendOK(req, responseb.build(), SchemaArchive.TableData.WRITE);
+        }).thenRun(() -> sendOK(req, responseb.build(), SchemaArchive.TableData.WRITE));
     }
 }

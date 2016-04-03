@@ -1,6 +1,5 @@
 package org.yamcs.web.rest.archive;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -29,28 +28,24 @@ import org.yamcs.web.rest.SqlBuilder;
 import org.yamcs.yarch.Stream;
 import org.yamcs.yarch.Tuple;
 
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufOutputStream;
-import io.netty.channel.ChannelFuture;
-
 public class ArchivePacketRestHandler extends RestHandler {
-    
+
     private static final Logger log = LoggerFactory.getLogger(ArchivePacketRestHandler.class);
-    
+
     @Route(path = "/api/archive/:instance/packets/:gentime?", method = "GET")
-    public ChannelFuture listPackets(RestRequest req) throws HttpException {
+    public void listPackets(RestRequest req) throws HttpException {
         String instance = verifyInstance(req, req.getRouteParam("instance"));
-        
+
         long pos = req.getQueryParameterAsLong("pos", 0);
         int limit = req.getQueryParameterAsInt("limit", 100);
-        
+
         Set<String> nameSet = new HashSet<>();
         for (String names : req.getQueryParameterList("name", Collections.emptyList())) {
             for (String name : names.split(",")) {
                 nameSet.add(name.trim());
             }
         }
-        
+
         SqlBuilder sqlb = new SqlBuilder(XtceTmRecorder.TABLE_NAME);
         IntervalResult ir = req.scanForInterval();
         if (ir.hasInterval()) {
@@ -61,14 +56,15 @@ public class ArchivePacketRestHandler extends RestHandler {
         }
         if (!nameSet.isEmpty()) {
             sqlb.where("pname in ('" + String.join("','", nameSet) + "')");
-        }        
+        }
         sqlb.descend(req.asksDescending(true));
-        
+
         if (req.asksFor(MediaType.OCTET_STREAM)) {
+            /* TODO FIXME
             ByteBuf buf = req.getChannelHandlerContext().alloc().buffer();
             try (ByteBufOutputStream bufOut = new ByteBufOutputStream(buf)) {
-                RestStreams.streamAndWait(instance, sqlb.toString(), new RestStreamSubscriber(pos, limit) {
-                    
+                RestStreams.runAsync(instance, sqlb.toString(), new RestStreamSubscriber(pos, limit) {
+
                     @Override
                     public void processTuple(Stream stream, Tuple tuple) {
                         TmPacketData pdata = GPBHelper.tupleToTmPacketData(tuple);
@@ -79,51 +75,53 @@ public class ArchivePacketRestHandler extends RestHandler {
                             // should improve to somehow throw upwards
                         }
                     }
+                }).thenRun(() -> {
+                    try {
+                        bufOut.close();
+                    } catch()
+                    sendOK(req, MediaType.OCTET_STREAM, buf);
                 });
-                bufOut.close();
-                return sendOK(req, MediaType.OCTET_STREAM, buf);
             } catch (IOException e) {
                 throw new InternalServerErrorException(e);
-            }
+            }*/
         } else {
             ListPacketsResponse.Builder responseb = ListPacketsResponse.newBuilder();
-            RestStreams.streamAndWait(instance, sqlb.toString(), new RestStreamSubscriber(pos, limit) {
-    
+            RestStreams.runAsync(instance, sqlb.toString(), new RestStreamSubscriber(pos, limit) {
+
                 @Override
                 public void processTuple(Stream stream, Tuple tuple) {
                     TmPacketData pdata = GPBHelper.tupleToTmPacketData(tuple);
                     responseb.addPacket(pdata);
                 }
-            });
-            return sendOK(req, responseb.build(), SchemaRest.ListPacketsResponse.WRITE);
+            }).thenRun(() -> sendOK(req, responseb.build(), SchemaRest.ListPacketsResponse.WRITE));
         }
     }
-    
+
     @Route(path = "/api/archive/:instance/packets/:gentime/:seqnum", method = "GET")
-    public ChannelFuture getPacket(RestRequest req) throws HttpException {
+    public void getPacket(RestRequest req) throws HttpException {
         String instance = verifyInstance(req, req.getRouteParam("instance"));
         long gentime = req.getDateRouteParam("gentime");
         int seqNum = req.getIntegerRouteParam("seqnum");
-        
+
         SqlBuilder sqlb = new SqlBuilder(XtceTmRecorder.TABLE_NAME)
                 .where("gentime = " + gentime, "seqNum = " + seqNum);
-        
+
         List<TmPacketData> packets = new ArrayList<>();
-        RestStreams.streamAndWait(instance, sqlb.toString(), new RestStreamSubscriber(0, 2) {
+        RestStreams.runAsync(instance, sqlb.toString(), new RestStreamSubscriber(0, 2) {
 
             @Override
             public void processTuple(Stream stream, Tuple tuple) {
                 TmPacketData pdata = GPBHelper.tupleToTmPacketData(tuple);
                 packets.add(pdata);
             }
+        }).thenRun(() -> {
+            if (packets.isEmpty()) {
+                sendRestError(req, new NotFoundException(req, "No packet for id (" + gentime + ", " + seqNum + ")"));
+            } else if (packets.size() > 1) {
+                sendRestError(req, new InternalServerErrorException("Too many results"));
+            } else {
+                sendOK(req, packets.get(0), SchemaYamcs.TmPacketData.WRITE);
+            }
         });
-        
-        if (packets.isEmpty()) {
-            throw new NotFoundException(req, "No packet for id (" + gentime + ", " + seqNum + ")");
-        } else if (packets.size() > 1) {
-            throw new InternalServerErrorException("Too many results");
-        } else {
-            return sendOK(req, packets.get(0), SchemaYamcs.TmPacketData.WRITE);
-        }
     }
 }

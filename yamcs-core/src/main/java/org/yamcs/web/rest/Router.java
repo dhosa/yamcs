@@ -25,7 +25,6 @@ import org.yamcs.protobuf.SchemaRest;
 import org.yamcs.security.AuthenticationToken;
 import org.yamcs.web.HttpException;
 import org.yamcs.web.HttpRequestHandler;
-import org.yamcs.web.InternalServerErrorException;
 import org.yamcs.web.MethodNotAllowedException;
 import org.yamcs.web.RouteHandler;
 import org.yamcs.web.rest.archive.ArchiveAlarmRestHandler;
@@ -240,12 +239,7 @@ public class Router {
                     }
                 }
             });
-
-        } catch (InternalServerErrorException e) {
-            log.error("Reporting internal server error to client", e);
-            RestHandler.sendRestError(req, e.getStatus(), e);
         } catch (HttpException e) {
-            log.warn("Sending nominal exception back to client: {}", e.getMessage());
             RestHandler.sendRestError(req, e.getStatus(), e);
         } catch (Throwable t) {
             log.error("Unexpected error " + t, t);

@@ -19,17 +19,15 @@ import org.yamcs.xtceproc.XtceDbFactory;
 import org.yamcs.yarch.Stream;
 import org.yamcs.yarch.Tuple;
 
-import io.netty.channel.ChannelFuture;
-
 public class ArchiveCommandRestHandler extends RestHandler {
-    
+
     @Route(path = "/api/archive/:instance/commands/:name*")
-    public ChannelFuture listCommands(RestRequest req) throws HttpException {
+    public void listCommands(RestRequest req) throws HttpException {
         String instance = verifyInstance(req, req.getRouteParam("instance"));
-        
+
         long pos = req.getQueryParameterAsLong("pos", 0);
         int limit = req.getQueryParameterAsInt("limit", 100);
-        
+
         SqlBuilder sqlb = new SqlBuilder(CommandHistoryRecorder.TABLE_NAME);
         IntervalResult ir = req.scanForInterval();
         if (ir.hasInterval()) {
@@ -41,16 +39,15 @@ public class ArchiveCommandRestHandler extends RestHandler {
             sqlb.where("cmdName = '" + cmd.getQualifiedName() + "'");
         }
         sqlb.descend(req.asksDescending(true));
-        
+
         ListCommandsResponse.Builder responseb = ListCommandsResponse.newBuilder();
-        RestStreams.streamAndWait(instance, sqlb.toString(), new RestStreamSubscriber(pos, limit) {
+        RestStreams.runAsync(instance, sqlb.toString(), new RestStreamSubscriber(pos, limit) {
 
             @Override
             public void processTuple(Stream stream, Tuple tuple) {
                 CommandHistoryEntry che = GPBHelper.tupleToCommandHistoryEntry(tuple);
                 responseb.addEntry(che);
             }
-        });
-        return sendOK(req, responseb.build(), SchemaRest.ListCommandsResponse.WRITE);
+        }).thenRun(() -> sendOK(req, responseb.build(), SchemaRest.ListCommandsResponse.WRITE));
     }
 }

@@ -63,7 +63,7 @@ public abstract class RestHandler extends RouteHandler {
         return HttpRequestHandler.sendOK(ctx, restRequest.getHttpRequest(), httpResponse);
     }
 
-    protected static <T extends MessageLite> ChannelFuture sendOK(RestRequest restRequest, T responseMsg, Schema<T> responseSchema) throws HttpException {
+    protected static <T extends MessageLite> ChannelFuture sendOK(RestRequest restRequest, T responseMsg, Schema<T> responseSchema) {
         ByteBuf body = restRequest.getChannelHandlerContext().alloc().buffer();
         ByteBufOutputStream channelOut = new ByteBufOutputStream(body);
         try {
@@ -76,7 +76,7 @@ public abstract class RestHandler extends RouteHandler {
                 body.writeBytes(NEWLINE_BYTES); // For curl comfort
             }
         } catch (IOException e) {
-            throw new InternalServerErrorException(e);
+            sendRestError(restRequest, new InternalServerErrorException(e));
         }
 
         HttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, OK, body);
@@ -99,7 +99,19 @@ public abstract class RestHandler extends RouteHandler {
         }
     }
 
+    protected static void sendRestError(RestRequest req, HttpException e) {
+        sendRestError(req, e.getStatus(), e);
+    }
+
     static void sendRestError(RestRequest req, HttpResponseStatus status, Throwable t) {
+        if (t instanceof InternalServerErrorException) {
+            log.error("Reporting internal server error to client", t);
+        } else if (t instanceof HttpException) {
+            log.warn("Sending nominal exception back to client: {}", t.getMessage());
+        } else {
+            log.error("Unexpected error " + t, t);
+        }
+
         MediaType contentType = req.deriveTargetContentType();
         ChannelHandlerContext ctx = req.getChannelHandlerContext();
         if (MediaType.JSON.equals(contentType)) {

@@ -153,7 +153,7 @@ public class ArchiveDownloadRestHandler extends RestHandler {
         String sql = sqlb.toString();
 
         if (req.asksFor(MediaType.OCTET_STREAM)) {
-            RestStreams.stream(instance, sql, new StreamToChunkedTransferEncoder(req, MediaType.OCTET_STREAM) {
+            RestStreams.runAsync(instance, sql, new StreamToChunkedTransferEncoder(req, MediaType.OCTET_STREAM) {
                 @Override
                 public void processTuple(Tuple tuple, ByteBufOutputStream bufOut) throws IOException {
                     byte[] raw = (byte[]) tuple.getColumn(TmDataLinkInitialiser.PACKET_COLUMN);
@@ -161,7 +161,7 @@ public class ArchiveDownloadRestHandler extends RestHandler {
                 }
             });
         } else {
-            RestStreams.stream(instance, sql, new StreamToChunkedProtobufEncoder<TmPacketData>(req, SchemaYamcs.TmPacketData.WRITE) {
+            RestStreams.runAsync(instance, sql, new StreamToChunkedProtobufEncoder<TmPacketData>(req, SchemaYamcs.TmPacketData.WRITE) {
                 @Override
                 public TmPacketData mapTuple(Tuple tuple) {
                     return GPBHelper.tupleToTmPacketData(tuple);
@@ -192,7 +192,7 @@ public class ArchiveDownloadRestHandler extends RestHandler {
         sqlb.descend(req.asksDescending(false));
         String sql = sqlb.toString();
 
-        RestStreams.stream(instance, sql, new StreamToChunkedProtobufEncoder<CommandHistoryEntry>(req, SchemaCommanding.CommandHistoryEntry.WRITE) {
+        RestStreams.runAsync(instance, sql, new StreamToChunkedProtobufEncoder<CommandHistoryEntry>(req, SchemaCommanding.CommandHistoryEntry.WRITE) {
             @Override
             public CommandHistoryEntry mapTuple(Tuple tuple) {
                 return GPBHelper.tupleToCommandHistoryEntry(tuple);
@@ -228,7 +228,7 @@ public class ArchiveDownloadRestHandler extends RestHandler {
         sqlb.descend(req.asksDescending(false));
         String sql = sqlb.toString();
 
-        RestStreams.stream(instance, sql, new StreamToChunkedProtobufEncoder<TableRecord>(req, SchemaArchive.TableData.TableRecord.WRITE) {
+        RestStreams.runAsync(instance, sql, new StreamToChunkedProtobufEncoder<TableRecord>(req, SchemaArchive.TableData.TableRecord.WRITE) {
 
             @Override
             public TableRecord mapTuple(Tuple tuple) {
@@ -269,7 +269,7 @@ public class ArchiveDownloadRestHandler extends RestHandler {
     }
 
     private void transferChunkedCSVEvents(RestRequest req, String instance, String sql) throws HttpException {
-        RestStreams.stream(instance, sql, new StreamToChunkedCSVEncoder(req) {
+        RestStreams.runAsync(instance, sql, new StreamToChunkedCSVEncoder(req) {
 
             @Override
             public String[] getCSVHeader() {
@@ -285,7 +285,7 @@ public class ArchiveDownloadRestHandler extends RestHandler {
     }
 
     private void transferChunkedProtobufEvents(RestRequest req, String instance, String sql) throws HttpException {
-        RestStreams.stream(instance, sql, new StreamToChunkedProtobufEncoder<Event>(req, SchemaYamcs.Event.WRITE) {
+        RestStreams.runAsync(instance, sql, new StreamToChunkedProtobufEncoder<Event>(req, SchemaYamcs.Event.WRITE) {
 
             @Override
             public Event mapTuple(Tuple tuple) {
