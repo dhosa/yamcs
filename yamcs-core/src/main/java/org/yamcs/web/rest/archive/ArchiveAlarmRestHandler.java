@@ -1,5 +1,7 @@
 package org.yamcs.web.rest.archive;
 
+import java.util.concurrent.CompletableFuture;
+
 import org.yamcs.archive.AlarmRecorder;
 import org.yamcs.protobuf.Alarms.AlarmData;
 import org.yamcs.protobuf.Rest.ListAlarmsResponse;
@@ -8,8 +10,6 @@ import org.yamcs.web.HttpException;
 import org.yamcs.web.rest.RestHandler;
 import org.yamcs.web.rest.RestRequest;
 import org.yamcs.web.rest.RestRequest.IntervalResult;
-import org.yamcs.web.rest.RestStreamSubscriber;
-import org.yamcs.web.rest.RestStreams;
 import org.yamcs.web.rest.Route;
 import org.yamcs.web.rest.SqlBuilder;
 import org.yamcs.xtce.Parameter;
@@ -18,12 +18,14 @@ import org.yamcs.xtceproc.XtceDbFactory;
 import org.yamcs.yarch.Stream;
 import org.yamcs.yarch.Tuple;
 
+import io.netty.channel.ChannelFuture;
+
 public class ArchiveAlarmRestHandler extends RestHandler {
 
     @Route(path="/api/archive/:instance/alarms", method="GET")
     @Route(path="/api/archive/:instance/alarms/:parameter*", method="GET")
     //@Route(path="/api/archive/:instance/alarms/:parameter*/:triggerTime?", method="GET") // same comment as below
-    public void listAlarms(RestRequest req) throws HttpException {
+    public CompletableFuture<ChannelFuture> listAlarms(RestRequest req) throws HttpException {
         String instance = verifyInstance(req, req.getRouteParam("instance"));
 
         long pos = req.getQueryParameterAsLong("pos", 0);
@@ -44,15 +46,21 @@ public class ArchiveAlarmRestHandler extends RestHandler {
         }*/
         sqlb.descend(req.asksDescending(true));
 
-        ListAlarmsResponse.Builder responseb = ListAlarmsResponse.newBuilder();
-        RestStreams.runAsync(instance, sqlb.toString(), new RestStreamSubscriber(pos, limit) {
+        FullStreamSupplier supplier = new FullStreamSupplier(instance, sqlb.toString(), pos, limit) {
+            ListAlarmsResponse.Builder responseb = ListAlarmsResponse.newBuilder();
 
             @Override
             public void processTuple(Stream stream, Tuple tuple) {
                 AlarmData alarm = ArchiveHelper.tupleToAlarmData(tuple);
                 responseb.addAlarm(alarm);
             }
-        }).thenRun(() -> sendOK(req, responseb.build(), SchemaRest.ListAlarmsResponse.WRITE));
+
+            @Override
+            public ChannelFuture writeFullResponse() throws HttpException {
+                return sendOK(req, responseb.build(), SchemaRest.ListAlarmsResponse.WRITE);
+            }
+        };
+        return CompletableFuture.supplyAsync(supplier, yamcsWorkerPool);
     }
 
     /*

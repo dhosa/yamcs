@@ -190,7 +190,7 @@ public class WebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocket
         dataSeqCount++;
         if(!channel.isOpen()) throw new IOException("Channel not open");
 
-        if(!channel.isWritable()) {
+        if(!channel.isWritable()) { // Perhaps should check active too https://github.com/netty/netty/issues/3300
             log.warn("Dropping {} message for client [id={}, username={}] because channel is not or no longer writable",
                     dataType, processorClient.getClientId(), processorClient.getUsername());
             droppedWrites++;

@@ -5,6 +5,9 @@ import static io.netty.handler.codec.http.HttpResponseStatus.OK;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
 import java.io.IOException;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +56,8 @@ import io.protostuff.Schema;
  */
 public abstract class RestHandler extends RouteHandler {
 
+    protected static final ExecutorService yamcsWorkerPool = Executors.newCachedThreadPool();
+
     private static final Logger log = LoggerFactory.getLogger(RestHandler.class);
     private static final byte[] NEWLINE_BYTES = "\r\n".getBytes();
 
@@ -76,7 +81,7 @@ public abstract class RestHandler extends RouteHandler {
                 body.writeBytes(NEWLINE_BYTES); // For curl comfort
             }
         } catch (IOException e) {
-            sendRestError(restRequest, new InternalServerErrorException(e));
+            return sendRestError(restRequest, new InternalServerErrorException(e));
         }
 
         HttpResponse httpResponse = new DefaultFullHttpResponse(HTTP_1_1, OK, body);
@@ -99,11 +104,19 @@ public abstract class RestHandler extends RouteHandler {
         }
     }
 
-    protected static void sendRestError(RestRequest req, HttpException e) {
-        sendRestError(req, e.getStatus(), e);
+    protected static ChannelFuture sendRestError(RestRequest req, HttpException e) {
+        return sendRestError(req, e.getStatus(), e);
     }
 
-    static void sendRestError(RestRequest req, HttpResponseStatus status, Throwable t) {
+    protected static ChannelFuture sendRestError(RestRequest req, Throwable t) {
+        // Remove inherited wrapper from exc of CompletableFuture
+        if (t instanceof CompletionException && t.getCause() != null) {
+            t = t.getCause();
+        }
+        return sendRestError(req, HttpResponseStatus.INTERNAL_SERVER_ERROR, t);
+    }
+
+    static ChannelFuture sendRestError(RestRequest req, HttpResponseStatus status, Throwable t) {
         if (t instanceof InternalServerErrorException) {
             log.error("Reporting internal server error to client", t);
         } else if (t instanceof HttpException) {
@@ -125,11 +138,11 @@ public abstract class RestHandler extends RouteHandler {
                 HttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, status, buf);
                 setContentTypeHeader(response, MediaType.JSON.toString()); // UTF-8 by default IETF RFC4627
                 setContentLength(response, buf.readableBytes());
-                HttpRequestHandler.sendError(ctx, req.getHttpRequest(), response);
+                return HttpRequestHandler.sendError(ctx, req.getHttpRequest(), response);
             } catch (IOException e2) {
                 log.error("Could not create JSON Generator", e2);
                 log.debug("Original exception not sent to client", t);
-                HttpRequestHandler.sendPlainTextError(ctx, req.getHttpRequest(), HttpResponseStatus.INTERNAL_SERVER_ERROR);
+                return HttpRequestHandler.sendPlainTextError(ctx, req.getHttpRequest(), HttpResponseStatus.INTERNAL_SERVER_ERROR);
             }
         } else if (MediaType.PROTOBUF.equals(contentType)) {
             ByteBuf buf = req.getChannelHandlerContext().alloc().buffer();
@@ -139,14 +152,14 @@ public abstract class RestHandler extends RouteHandler {
                 HttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, status, buf);
                 setContentTypeHeader(response, MediaType.PROTOBUF.toString());
                 setContentLength(response, buf.readableBytes());
-                HttpRequestHandler.sendError(ctx, req.getHttpRequest(), response);
+                return HttpRequestHandler.sendError(ctx, req.getHttpRequest(), response);
             } catch (IOException e2) {
                 log.error("Could not write to channel buffer", e2);
                 log.debug("Original exception not sent to client", t);
-                HttpRequestHandler.sendPlainTextError(ctx, req.getHttpRequest(), HttpResponseStatus.INTERNAL_SERVER_ERROR);
+                return HttpRequestHandler.sendPlainTextError(ctx, req.getHttpRequest(), HttpResponseStatus.INTERNAL_SERVER_ERROR);
             }
         } else {
-            HttpRequestHandler.sendPlainTextError(ctx, req.getHttpRequest(), HttpResponseStatus.INTERNAL_SERVER_ERROR);
+            return HttpRequestHandler.sendPlainTextError(ctx, req.getHttpRequest(), HttpResponseStatus.INTERNAL_SERVER_ERROR);
         }
     }
 

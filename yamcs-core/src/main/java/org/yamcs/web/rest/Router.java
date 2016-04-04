@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -68,21 +69,21 @@ import io.netty.handler.codec.http.QueryStringDecoder;
  * expanded upon registration into the actual yamcs instance.
  */
 public class Router {
-    
+
     private static final Pattern ROUTE_PATTERN = Pattern.compile("(\\/)?:(\\w+)([\\?\\*])?");
     private static final Logger log = LoggerFactory.getLogger(Router.class);
 
     // Order, because patterns are matched top-down in insertion order
     private LinkedHashMap<Pattern, Map<HttpMethod, RouteConfig>> defaultRoutes = new LinkedHashMap<>();
     private LinkedHashMap<Pattern, Map<HttpMethod, RouteConfig>> dynamicRoutes = new LinkedHashMap<>();
-    
+
     public Router() {
         registerRouteHandler(null, new ClientRestHandler());
         registerRouteHandler(null, new DisplayRestHandler());
         registerRouteHandler(null, new InstanceRestHandler());
         registerRouteHandler(null, new LinkRestHandler());
         registerRouteHandler(null, new UserRestHandler());
-        
+
         registerRouteHandler(null, new ArchiveAlarmRestHandler());
         registerRouteHandler(null, new ArchiveCommandRestHandler());
         registerRouteHandler(null, new ArchiveDownloadRestHandler());
@@ -95,26 +96,26 @@ public class Router {
         registerRouteHandler(null, new ArchiveStreamRestHandler());
         registerRouteHandler(null, new ArchiveTableRestHandler());
         registerRouteHandler(null, new ArchiveTagRestHandler());
-        
+
         registerRouteHandler(null, new ProcessorRestHandler());
         registerRouteHandler(null, new ProcessorParameterRestHandler());
         registerRouteHandler(null, new ProcessorCommandRestHandler());
         registerRouteHandler(null, new ProcessorCommandQueueRestHandler());
-        
+
         registerRouteHandler(null, new MDBRestHandler());
-        registerRouteHandler(null, new MDBParameterRestHandler());    
+        registerRouteHandler(null, new MDBParameterRestHandler());
         registerRouteHandler(null, new MDBContainerRestHandler());
         registerRouteHandler(null, new MDBCommandRestHandler());
         registerRouteHandler(null, new MDBAlgorithmRestHandler());
-        
+
         registerRouteHandler(null, new OverviewRouteHandler());
     }
-    
+
     // Using method handles for better invoke performance
     public void registerRouteHandler(String instance, RouteHandler routeHandler) {
         MethodHandles.Lookup lookup = MethodHandles.lookup();
         Method[] declaredMethods = routeHandler.getClass().getDeclaredMethods();
-        
+
         // Temporary structure used to sort before map insertion
         List<RouteConfig> routeConfigs = new ArrayList<>();
         try {
@@ -122,7 +123,7 @@ public class Router {
                 Method reflectedMethod = declaredMethods[i];
                 if (reflectedMethod.isAnnotationPresent(Route.class) || reflectedMethod.isAnnotationPresent(Routes.class)) {
                     MethodHandle handle = lookup.unreflect(reflectedMethod);
-                    
+
                     Route[] anns = reflectedMethod.getDeclaredAnnotationsByType(Route.class);
                     for (Route ann : anns) {
                         for (String m : ann.method()) {
@@ -135,16 +136,16 @@ public class Router {
         } catch (IllegalAccessException e) {
             throw new RuntimeException("Could not access @Route annotated method in " + routeHandler.getClass());
         }
-        
+
         // Sort in a way that increases chances of a good URI match
         // 1. @Route(priority=true) first
         // 2. Descending on path length
         // 3. Actual path contents (should not matter too much)
         Collections.sort(routeConfigs);
-        
+
         LinkedHashMap<Pattern, Map<HttpMethod, RouteConfig>> targetRoutes;
         targetRoutes = (instance == null) ? defaultRoutes : dynamicRoutes;
-        
+
         for (RouteConfig routeConfig : routeConfigs) {
             String routeString = routeConfig.originalPath;
             if (instance != null) { // Expand :instance upon registration (only for dynamic routes)
@@ -156,15 +157,15 @@ public class Router {
             configByMethod.put(routeConfig.httpMethod, routeConfig);
         }
     }
-    
+
     public void handleHttpRequest(ChannelHandlerContext ctx, FullHttpRequest req, AuthenticationToken token) {
         QueryStringDecoder qsDecoder = new QueryStringDecoder(req.getUri());
         RestRequest restReq = new RestRequest(ctx, req, qsDecoder, token);
-        
+
         try {
             // Decode first the path/qs difference, then url-decode the path
             String uri = new URI(qsDecoder.path()).getPath();
-            
+
             RouteMatch match = matchURI(req.getMethod(), uri);
             restReq.setRouteMatch(match);
             if (match != null) {
@@ -178,7 +179,7 @@ public class Router {
             RestHandler.sendRestError(restReq, e.getStatus(), e);
         }
     }
-    
+
     protected RouteMatch matchURI(HttpMethod method, String uri) throws MethodNotAllowedException {
         Set<HttpMethod> allowedMethods = null;
         for (Entry<Pattern, Map<HttpMethod, RouteConfig>> entry : defaultRoutes.entrySet()) {
@@ -195,7 +196,7 @@ public class Router {
                 }
             }
         }
-        
+
         for (Entry<Pattern, Map<HttpMethod, RouteConfig>> entry : dynamicRoutes.entrySet()) {
             Matcher matcher = entry.getKey().matcher(uri);
             if (matcher.matches()) {
@@ -210,44 +211,46 @@ public class Router {
                 }
             }
         }
-        
+
         if (allowedMethods != null) { // One or more rules matched, but with wrong method
             throw new MethodNotAllowedException(method, uri, allowedMethods);
         } else { // No rule was matched
             return null;
         }
     }
-    
+
+    @SuppressWarnings("unchecked")
     protected void dispatch(RestRequest req, RouteMatch match) {
         try {
             RouteHandler target = match.routeConfig.routeHandler;
-            
-            // FIXME handleRequest must never return null! Futures are used to follow up on handling
-            ChannelFuture responseFuture = (ChannelFuture) match.routeConfig.handle.invoke(target, req);
-            if (responseFuture == null) return; // Allowed, when the specific handler prefers to do this
-            
-            /**
-             * Follow-up on the successful write, to provide some hints when a future was not actually
-             * successfully delivered.
-             */
-            responseFuture.addListener(new ChannelFutureListener() {
-                @Override
-                public void operationComplete(ChannelFuture future) throws Exception {
-                    if (!future.isSuccess()) {
-                        log.error("Error writing out response to client", future.cause());
-                        future.channel().close();
-                    }
-                }
-            });
+
+            // FIXME handleRequest must never return null! futures are to be used to follow up on handling
+            Object returnType = match.routeConfig.handle.invoke(target, req);
+
+            if (returnType == null) return; // Allowed, when the specific handler prefers to do this
+            else if (returnType instanceof ChannelFuture) {
+                // Follow-up on the successful write, to provide some hints when a future was not actually
+                // successfully delivered.
+                ((ChannelFuture) returnType).addListener(CLOSE_ON_FAILURE);
+            } else {
+                CompletableFuture<ChannelFuture> completableFuture = (CompletableFuture<ChannelFuture>) returnType;
+                completableFuture.thenAccept(channelFuture -> {
+                    // Follow-up on succesful write response to client. To close channel in case of mishap.
+                    channelFuture.addListener(CLOSE_ON_FAILURE);
+                }).exceptionally(t -> {
+                    RestHandler.sendRestError(req, t);
+                    return null;
+                });
+            }
         } catch (HttpException e) {
             RestHandler.sendRestError(req, e.getStatus(), e);
         } catch (Throwable t) {
             log.error("Unexpected error " + t, t);
-            RestHandler.sendRestError(req, HttpResponseStatus.INTERNAL_SERVER_ERROR, t);
+            RestHandler.sendRestError(req, t);
         }
     }
-    
-    
+
+
     /*
      * Pattern matching loosely inspired from angular and express.js
      */
@@ -270,14 +273,14 @@ public class Router {
                 replacement.append("(?<").append(matcher.group(2)).append(">");
                 replacement.append(star ? ".+?" : "[^/]+");
                 replacement.append(")");
-            }            
+            }
 
             matcher.appendReplacement(buf, replacement.toString());
         }
         matcher.appendTail(buf);
         return Pattern.compile(buf.append("$").toString());
     }
-    
+
     /**
      * Struct containing all non-path route configuration
      */
@@ -287,7 +290,7 @@ public class Router {
         final boolean priority;
         final HttpMethod httpMethod;
         final MethodHandle handle;
-        
+
         RouteConfig(RouteHandler routeHandler, String originalPath, boolean priority, HttpMethod httpMethod, MethodHandle handle) {
             this.routeHandler = routeHandler;
             this.originalPath = originalPath;
@@ -306,43 +309,53 @@ public class Router {
                 if (pathLengthCompare != 0) {
                     return -pathLengthCompare;
                 } else {
-                    return originalPath.compareTo(o.originalPath);                    
+                    return originalPath.compareTo(o.originalPath);
                 }
             }
         }
     }
-    
+
     /**
      * Represents a matched route pattern
      */
     public static final class RouteMatch {
         final Matcher regexMatch;
         final RouteConfig routeConfig;
-        
+
         RouteMatch(Matcher regexMatch, RouteConfig routeConfig) {
             this.regexMatch = regexMatch;
             this.routeConfig = routeConfig;
         }
     }
-    
+
     /**
      * 'Documents' all registered resources
      */
     private final class OverviewRouteHandler extends RestHandler {
-    
+
         @Route(path="/api", method="GET")
         public ChannelFuture getApiOverview(RestRequest req) throws HttpException {
-            
+
             // Unique accross http methods, and according to insertion order
             Set<String> urls = new LinkedHashSet<>();
             for (Map<HttpMethod, RouteConfig> map : defaultRoutes.values()) {
                 map.values().forEach(v -> urls.add(v.originalPath));
             }
-            
+
             GetApiOverviewResponse.Builder responseb = GetApiOverviewResponse.newBuilder();
             urls.forEach(url -> responseb.addUrl(url));
-            
+
             return sendOK(req, responseb.build(), SchemaRest.GetApiOverviewResponse.WRITE);
         }
     }
+
+    private static final ChannelFutureListener CLOSE_ON_FAILURE = new ChannelFutureListener() {
+        @Override
+        public void operationComplete(ChannelFuture future) throws Exception {
+            if (!future.isSuccess()) {
+                log.error("Error writing out response to client", future.cause());
+                future.channel().close();
+            }
+        }
+    };
 }

@@ -2,6 +2,7 @@ package org.yamcs.web.rest.archive;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 import org.yamcs.protobuf.Archive.TableData;
 import org.yamcs.protobuf.Archive.TableData.TableRecord;
@@ -13,8 +14,6 @@ import org.yamcs.web.BadRequestException;
 import org.yamcs.web.HttpException;
 import org.yamcs.web.rest.RestHandler;
 import org.yamcs.web.rest.RestRequest;
-import org.yamcs.web.rest.RestStreamSubscriber;
-import org.yamcs.web.rest.RestStreams;
 import org.yamcs.web.rest.Route;
 import org.yamcs.web.rest.SqlBuilder;
 import org.yamcs.yarch.Stream;
@@ -49,7 +48,7 @@ public class ArchiveTableRestHandler extends RestHandler {
     }
 
     @Route(path = "/api/archive/:instance/tables/:name/data", method = "GET")
-    public void getTableData(RestRequest req) throws HttpException {
+    public CompletableFuture<ChannelFuture> getTableData(RestRequest req) throws HttpException {
         String instance = verifyInstance(req, req.getRouteParam("instance"));
         YarchDatabase ydb = YarchDatabase.getInstance(instance);
         TableDefinition table = verifyTable(req, ydb, req.getRouteParam("name"));
@@ -76,9 +75,8 @@ public class ArchiveTableRestHandler extends RestHandler {
         }
         sqlb.descend(req.asksDescending(true));
 
-        String sql = sqlb.toString();
-        TableData.Builder responseb = TableData.newBuilder();
-        RestStreams.runAsync(instance, sql, new RestStreamSubscriber(pos, limit) {
+        FullStreamSupplier supplier = new FullStreamSupplier(instance, sqlb.toString(), pos, limit) {
+            TableData.Builder responseb = TableData.newBuilder();
 
             @Override
             public void processTuple(Stream stream, Tuple tuple) {
@@ -86,6 +84,12 @@ public class ArchiveTableRestHandler extends RestHandler {
                 rec.addAllColumn(ArchiveHelper.toColumnDataList(tuple));
                 responseb.addRecord(rec); // TODO estimate byte size
             }
-        }).thenRun(() -> sendOK(req, responseb.build(), SchemaArchive.TableData.WRITE));
+
+            @Override
+            public ChannelFuture writeFullResponse() throws HttpException {
+                return sendOK(req, responseb.build(), SchemaArchive.TableData.WRITE);
+            }
+        };
+        return CompletableFuture.supplyAsync(supplier, yamcsWorkerPool);
     }
 }

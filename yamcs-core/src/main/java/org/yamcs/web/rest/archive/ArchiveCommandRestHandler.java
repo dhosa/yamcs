@@ -1,5 +1,7 @@
 package org.yamcs.web.rest.archive;
 
+import java.util.concurrent.CompletableFuture;
+
 import org.yamcs.archive.GPBHelper;
 import org.yamcs.cmdhistory.CommandHistoryRecorder;
 import org.yamcs.protobuf.Commanding.CommandHistoryEntry;
@@ -9,8 +11,6 @@ import org.yamcs.web.HttpException;
 import org.yamcs.web.rest.RestHandler;
 import org.yamcs.web.rest.RestRequest;
 import org.yamcs.web.rest.RestRequest.IntervalResult;
-import org.yamcs.web.rest.RestStreamSubscriber;
-import org.yamcs.web.rest.RestStreams;
 import org.yamcs.web.rest.Route;
 import org.yamcs.web.rest.SqlBuilder;
 import org.yamcs.xtce.MetaCommand;
@@ -19,10 +19,12 @@ import org.yamcs.xtceproc.XtceDbFactory;
 import org.yamcs.yarch.Stream;
 import org.yamcs.yarch.Tuple;
 
+import io.netty.channel.ChannelFuture;
+
 public class ArchiveCommandRestHandler extends RestHandler {
 
     @Route(path = "/api/archive/:instance/commands/:name*")
-    public void listCommands(RestRequest req) throws HttpException {
+    public CompletableFuture<ChannelFuture> listCommands(RestRequest req) throws HttpException {
         String instance = verifyInstance(req, req.getRouteParam("instance"));
 
         long pos = req.getQueryParameterAsLong("pos", 0);
@@ -40,14 +42,20 @@ public class ArchiveCommandRestHandler extends RestHandler {
         }
         sqlb.descend(req.asksDescending(true));
 
-        ListCommandsResponse.Builder responseb = ListCommandsResponse.newBuilder();
-        RestStreams.runAsync(instance, sqlb.toString(), new RestStreamSubscriber(pos, limit) {
+        FullStreamSupplier supplier = new FullStreamSupplier(instance, sqlb.toString(), pos, limit) {
+            ListCommandsResponse.Builder responseb = ListCommandsResponse.newBuilder();
 
             @Override
             public void processTuple(Stream stream, Tuple tuple) {
                 CommandHistoryEntry che = GPBHelper.tupleToCommandHistoryEntry(tuple);
                 responseb.addEntry(che);
             }
-        }).thenRun(() -> sendOK(req, responseb.build(), SchemaRest.ListCommandsResponse.WRITE));
+
+            @Override
+            public ChannelFuture writeFullResponse() throws HttpException {
+                return sendOK(req, responseb.build(), SchemaRest.ListCommandsResponse.WRITE);
+            }
+        };
+        return CompletableFuture.supplyAsync(supplier, yamcsWorkerPool);
     }
 }

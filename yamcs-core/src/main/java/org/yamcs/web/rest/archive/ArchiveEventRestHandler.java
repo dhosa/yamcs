@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,8 +27,6 @@ import org.yamcs.web.InternalServerErrorException;
 import org.yamcs.web.rest.RestHandler;
 import org.yamcs.web.rest.RestRequest;
 import org.yamcs.web.rest.RestRequest.IntervalResult;
-import org.yamcs.web.rest.RestStreamSubscriber;
-import org.yamcs.web.rest.RestStreams;
 import org.yamcs.web.rest.Route;
 import org.yamcs.web.rest.SqlBuilder;
 import org.yamcs.yarch.Stream;
@@ -46,7 +45,7 @@ public class ArchiveEventRestHandler extends RestHandler {
     Map<String, EventProducer> eventProducerMap = new HashMap<>();
 
     @Route(path = "/api/archive/:instance/events", method = "GET")
-    public void listEvents(RestRequest req) throws HttpException {
+    public CompletableFuture<ChannelFuture> listEvents(RestRequest req) throws HttpException {
         String instance = verifyInstance(req, req.getRouteParam("instance"));
 
         long pos = req.getQueryParameterAsLong("pos", 0);
@@ -80,7 +79,7 @@ public class ArchiveEventRestHandler extends RestHandler {
                 throw new InternalServerErrorException(e);
             }
 
-            RestStreams.runAsync(instance, sql, new RestStreamSubscriber(pos, limit) {
+            FullStreamSupplier supplier = new FullStreamSupplier(instance, sql, pos, limit) {
 
                 @Override
                 public void processTuple(Stream stream, Tuple tuple) {
@@ -91,14 +90,23 @@ public class ArchiveEventRestHandler extends RestHandler {
                         log.error("Could not write csv record ", e);
                     }
                 }
-            }).thenRun(() -> {
-                w.close();
-                sendOK(req, MediaType.CSV, buf);
-            });
 
+                @Override
+                public ChannelFuture writeFullResponse() throws HttpException {
+                    w.close();
+                    return sendOK(req, MediaType.CSV, buf);
+                }
+            };
+
+            CompletableFuture<ChannelFuture> completableFuture = CompletableFuture.supplyAsync(supplier, yamcsWorkerPool);
+            completableFuture.exceptionally(t -> {
+                w.close();
+                return null;
+            });
+            return completableFuture;
         } else {
-            ListEventsResponse.Builder responseb = ListEventsResponse.newBuilder();
-            RestStreams.runAsync(instance, sql, new RestStreamSubscriber(pos, limit) {
+            FullStreamSupplier supplier = new FullStreamSupplier(instance, sql, pos, limit) {
+                ListEventsResponse.Builder responseb = ListEventsResponse.newBuilder();
 
                 @Override
                 public void processTuple(Stream stream, Tuple tuple) {
@@ -107,7 +115,13 @@ public class ArchiveEventRestHandler extends RestHandler {
                     event.setReceptionTimeUTC(TimeEncoding.toString(event.getReceptionTime()));
                     responseb.addEvent(event);
                 }
-            }).thenRun(() -> sendOK(req, responseb.build(), SchemaRest.ListEventsResponse.WRITE));
+
+                @Override
+                public ChannelFuture writeFullResponse() throws HttpException {
+                    return sendOK(req, responseb.build(), SchemaRest.ListEventsResponse.WRITE);
+                }
+            };
+            return CompletableFuture.supplyAsync(supplier, yamcsWorkerPool);
         }
     }
 
