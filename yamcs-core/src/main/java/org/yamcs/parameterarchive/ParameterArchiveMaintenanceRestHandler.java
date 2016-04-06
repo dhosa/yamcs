@@ -4,7 +4,6 @@ package org.yamcs.parameterarchive;
 import java.util.Arrays;
 
 import org.yamcs.YamcsServer;
-import org.yamcs.parameterarchive.ParameterArchive;
 import org.yamcs.parameterarchive.ParameterIdDb.ParameterId;
 import org.yamcs.protobuf.Yamcs.StringMessage;
 import org.yamcs.security.Privilege;
@@ -25,13 +24,13 @@ import io.netty.channel.ChannelFuture;
 public class ParameterArchiveMaintenanceRestHandler extends RestHandler {
     /**
      * Request to (re)build the parameterArchive between start and stop
-     * 
+     *
      */
     @Route(path = "/api/archive/:instance/parameterArchive/rebuild")
     public ChannelFuture reprocess(RestRequest req) throws HttpException {
         String instance = verifyInstance(req, req.getRouteParam("instance"));
         checkPrivileges(req);
-            
+
         if(!req.hasQueryParameter("start")) {
             throw new BadRequestException("no start specified");
         }
@@ -40,23 +39,23 @@ public class ParameterArchiveMaintenanceRestHandler extends RestHandler {
         }
         long start = req.getQueryParameterAsDate("start");
         long stop = req.getQueryParameterAsDate("stop");
-        
-        
+
+
         ParameterArchive parchive = getParameterArchive(instance);
         try {
             parchive.reprocess(start, stop);
         } catch (IllegalArgumentException e){
             throw new BadRequestException(e.getMessage());
         }
-        
+
         return sendOK(req);
     }
-    
+
     @Route(path = "/api/archive/:instance/parameterArchive/info/parameter/:name*")
     public ChannelFuture archiveInfo(RestRequest req) throws HttpException {
         String instance = verifyInstance(req, req.getRouteParam("instance"));
         checkPrivileges(req);
-        
+
         String fqn = req.getRouteParam("name");
         ParameterArchive parchive = getParameterArchive(instance);
         ParameterIdDb pdb = parchive.getParameterIdDb();
@@ -64,8 +63,8 @@ public class ParameterArchiveMaintenanceRestHandler extends RestHandler {
         StringMessage sm = StringMessage.newBuilder().setMessage(Arrays.toString(pids)).build();
         return sendOK(req, sm, org.yamcs.protobuf.SchemaYamcs.StringMessage.WRITE);
     }
-   
-    
+
+
     private static ParameterArchive getParameterArchive(String instance) throws BadRequestException {
         ParameterArchive parameterArchive = YamcsServer.getService(instance, ParameterArchive.class);
         if (parameterArchive == null) {
@@ -73,11 +72,11 @@ public class ParameterArchiveMaintenanceRestHandler extends RestHandler {
         }
         return parameterArchive;
     }
-    
+
     private void checkPrivileges(RestRequest req) throws HttpException {
         if(!Privilege.getInstance().hasPrivilege(req.getAuthToken(), Privilege.Type.SYSTEM, Privilege.SystemPrivilege.MayControlArchiving.name()))  {
             throw new ForbiddenException("No privilege for this operation");
         }
     }
-    
+
 }

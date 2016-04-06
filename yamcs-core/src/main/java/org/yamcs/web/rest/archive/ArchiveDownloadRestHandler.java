@@ -29,7 +29,7 @@ import org.yamcs.protobuf.Yamcs.ReplayRequest;
 import org.yamcs.protobuf.Yamcs.ReplaySpeed;
 import org.yamcs.protobuf.Yamcs.ReplaySpeed.ReplaySpeedType;
 import org.yamcs.protobuf.Yamcs.TmPacketData;
-import org.yamcs.tctm.TmDataLinkInitialiser;
+import org.yamcs.tctm.TmProviderAdapter;
 import org.yamcs.ui.ParameterRetrievalGui;
 import org.yamcs.web.BadRequestException;
 import org.yamcs.web.HttpException;
@@ -156,7 +156,7 @@ public class ArchiveDownloadRestHandler extends RestHandler {
             RestStreams.runAsync(instance, sql, new StreamToChunkedTransferEncoder(req, MediaType.OCTET_STREAM) {
                 @Override
                 public void processTuple(Tuple tuple, ByteBufOutputStream bufOut) throws IOException {
-                    byte[] raw = (byte[]) tuple.getColumn(TmDataLinkInitialiser.PACKET_COLUMN);
+                    byte[] raw = (byte[]) tuple.getColumn(TmProviderAdapter.PACKET_COLUMN);
                     bufOut.write(raw);
                 }
             });
