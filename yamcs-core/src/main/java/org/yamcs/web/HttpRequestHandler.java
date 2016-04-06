@@ -49,13 +49,14 @@ import io.netty.util.CharsetUtil;
 public class HttpRequestHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
     private static final String STATIC_PATH = "_static";
+    private static final String WEBSOCKET_PATH = "_websocket";
     private static final String API_PATH = "api";
 
     public static final AttributeKey<ChunkedTransferStats> CTX_CHUNK_STATS = AttributeKey.valueOf("chunkedTransferStats");
 
     private static final Logger log = LoggerFactory.getLogger(HttpRequestHandler.class);
 
-    private static StaticFileHandler fileRequestHandler = new StaticFileHandler();
+    private static final StaticFileHandler fileRequestHandler = new StaticFileHandler();
     private Router apiRouter;
 
     public HttpRequestHandler(Router apiRouter) {
@@ -107,7 +108,7 @@ public class HttpRequestHandler extends SimpleChannelInboundHandler<FullHttpRequ
             if (path.length > 2) {
                 String[] rpath = path[2].split("/", 2);
                 String handler = rpath[0];
-                if (WebSocketFrameHandler.WEBSOCKET_PATH.equals(handler)) {
+                if (WEBSOCKET_PATH.equals(handler)) {
                     prepareChannelForWebSocketUpgrade(ctx, req, yamcsInstance, authToken);
                     return;
                 } else {
@@ -141,7 +142,7 @@ public class HttpRequestHandler extends SimpleChannelInboundHandler<FullHttpRequ
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        log.error("Will close channel due to exception", cause);
+        log.error(String.format("Closing channel %s due to exception", ctx.channel()), cause);
         ctx.close();
     }
 

@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.yamcs.api.MediaType;
 import org.yamcs.web.HttpException;
 import org.yamcs.web.InternalServerErrorException;
-import org.yamcs.web.StaticFileHandler;
+import org.yamcs.web.WebConfiguration;
 
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -20,9 +20,9 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.channel.ChannelFuture;
 
-/** 
+/**
  * provides information about available displays
- * 
+ *
  * Currently the only method supported is "list"
  * @author nm
  *
@@ -36,12 +36,12 @@ public class DisplayRestHandler extends RestHandler {
         String instance = verifyInstance(req, req.getRouteParam("instance"));
         ByteBuf cb=req.getChannelHandlerContext().alloc().buffer(1024);
         ByteBufOutputStream cbos=new ByteBufOutputStream(cb);
-        
+
         try (JsonGenerator json = jsonFactory.createGenerator(cbos, JsonEncoding.UTF8)) {
             json.writeStartArray();
-            
+
             File displayDir = null;
-            for (String webRoot : StaticFileHandler.WEB_Roots) {
+            for (String webRoot : WebConfiguration.getInstance().getWebRoots()) {
                 File dir = new File(webRoot + File.separator + instance + File.separator + "displays");
                 if (dir.exists()) {
                     displayDir = dir;
@@ -57,7 +57,7 @@ public class DisplayRestHandler extends RestHandler {
             throw new InternalServerErrorException(e);
         }
     }
-    
+
     private void writeFilesFromDir(JsonGenerator json, Path path, File f) throws JsonGenerationException, IOException {
         if(!f.isDirectory()) {
             log.warn("Supposed to list all files from '{}' but it's not a directory", f);
@@ -86,7 +86,7 @@ public class DisplayRestHandler extends RestHandler {
             path.index--;
         }
     }
-    
+
     private static class Path {
         int index=0;
         ArrayList<String> list=new ArrayList<>();

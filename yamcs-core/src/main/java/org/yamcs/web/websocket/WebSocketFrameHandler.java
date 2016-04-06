@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,8 +14,10 @@ import org.yamcs.api.ws.WSConstants;
 import org.yamcs.protobuf.Web.WebSocketServerMessage.WebSocketReplyData;
 import org.yamcs.protobuf.Yamcs.ProtoDataType;
 import org.yamcs.security.AuthenticationToken;
+import org.yamcs.utils.TimeEncoding;
 import org.yamcs.web.HttpRequestHandler;
 import org.yamcs.web.HttpRequestInfo;
+import org.yamcs.web.WebConfiguration;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
@@ -23,6 +27,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler.ServerHandshakeStateEvent;
@@ -34,7 +39,6 @@ import io.protostuff.Schema;
  */
 public class WebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocketFrame> {
 
-    public static final String WEBSOCKET_PATH = "_websocket";
     public static final AttributeKey<HttpRequestInfo> CTX_HTTP_REQUEST_INFO = AttributeKey.valueOf("httpRequestInfo");
 
     private static final Logger log = LoggerFactory.getLogger(WebSocketFrameHandler.class);
@@ -57,8 +61,12 @@ public class WebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocket
     // Provides access to the various resources served through this websocket
     private Map<String, AbstractWebSocketResource> resourcesByName = new HashMap<>();
 
+    private final boolean enablePings;
+    private ScheduledFuture<?> pingTaskHandle;
+
     public WebSocketFrameHandler(HttpRequestInfo originalRequestInfo) {
         this.originalRequestInfo = originalRequestInfo;
+        enablePings = (WebConfiguration.getInstance().getWebTimeout() > 0);
     }
 
     @Override
@@ -87,6 +95,13 @@ public class WebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocket
 
             // After upgrade, no further HTTP messages will be received
             ctx.pipeline().remove(HttpRequestHandler.class);
+
+            // Schedule pings so that when client answers with pong, read timeout will not trigger
+            // Ping messages contain wall-clock time. Since pongs have to respond with same message,
+            // this could enable us to keep track of some sort of delay metrics on the websocket channel.
+            if (enablePings) {
+                pingTaskHandle = ctx.executor().scheduleWithFixedDelay(new PingTask(ctx), 0, 5000, TimeUnit.MILLISECONDS);
+            }
         } else {
             super.userEventTriggered(ctx, evt);
         }
@@ -109,6 +124,7 @@ public class WebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocket
                     if (encoder == null)
                         encoder = new ProtobufEncoder(ctx);
                 } else {
+                    log.warn("Received unexpected websocket frame {}", frame);
                     // Pong, ping, continuation and close should already be handled by netty's handler
                     return;
                 }
@@ -144,14 +160,14 @@ public class WebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocket
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        log.error("Will close channel due to internal error", cause);
+        log.error(String.format("Closing channel %s due to exception", ctx.channel()), cause);
         ctx.close();
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         if (processorClient != null) {
-            log.info("Channel " + ctx.channel().remoteAddress() + " closed");
+            log.error(String.format("Channel %s closed", ctx.channel()));
             processorClient.quit();
         }
     }
@@ -207,5 +223,24 @@ public class WebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocket
         channel.writeAndFlush(frame);
     }
 
+    private final class PingTask implements Runnable {
 
+        private final ChannelHandlerContext ctx;
+
+        PingTask(ChannelHandlerContext ctx) {
+            this.ctx = ctx;
+        }
+
+        @Override
+        public void run() {
+            log.info("schedule thread alive");
+            if (!ctx.channel().isOpen()) {
+                pingTaskHandle.cancel(true);
+            } else {
+                log.info("Sending out ping request");
+                ByteBuf buf = ctx.alloc().buffer().writeLong(TimeEncoding.getWallclockTime());
+                ctx.writeAndFlush(new PingWebSocketFrame(buf));
+            }
+        }
+    }
 }
