@@ -85,4 +85,9 @@ public class WebSocketProcessorClient implements YProcessorClient {
         ManagementService.getInstance().unregisterClient(clientId);
         resources.forEach(r -> r.quit());
     }
+    
+    @Override
+    public String toString() {
+        return username + "[id=" + clientId + ", app=" + applicationName + "]";
+    }
 }

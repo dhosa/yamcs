@@ -160,16 +160,13 @@ public class WebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocket
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        log.error(String.format("Closing channel %s due to exception", ctx.channel()), cause);
-        ctx.close();
+        log.error(String.format("Closing channel %s for %s due to exception", ctx.channel(), processorClient), cause);
+        cleanupAndClose();
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        if (processorClient != null) {
-            log.error(String.format("Channel %s closed", ctx.channel()));
-            processorClient.quit();
-        }
+        cleanup();
     }
 
     void addResource(String name, AbstractWebSocketResource resource) {
@@ -214,13 +211,25 @@ public class WebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocket
             if (droppedWrites == 5) {
                 log.warn("Too many failed writes for client [id={}, username={}]. Forcing disconnect",
                         processorClient.getClientId(), processorClient.getUsername());
-                ctx.close();
+                cleanupAndClose();
             }
             return;
         }
         droppedWrites = 0;
         WebSocketFrame frame = encoder.encodeData(dataSeqCount, dataType, data, schema);
         channel.writeAndFlush(frame);
+    }
+    
+    private void cleanupAndClose() {
+        cleanup();
+        ctx.close();
+    }
+    
+    private void cleanup() {
+        if (processorClient != null) {
+            log.info("Cleaning up processor client " + processorClient);
+            processorClient.quit();
+        }
     }
 
     private final class PingTask implements Runnable {
@@ -233,11 +242,10 @@ public class WebSocketFrameHandler extends SimpleChannelInboundHandler<WebSocket
 
         @Override
         public void run() {
-            log.info("schedule thread alive");
             if (!ctx.channel().isOpen()) {
                 pingTaskHandle.cancel(true);
             } else {
-                log.info("Sending out ping request");
+                log.trace("Sending out ping request");
                 ByteBuf buf = ctx.alloc().buffer().writeLong(TimeEncoding.getWallclockTime());
                 ctx.writeAndFlush(new PingWebSocketFrame(buf));
             }
